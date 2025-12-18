@@ -1,6 +1,8 @@
 import asyncio
 from datetime import datetime
 
+import sys
+
 from task._models.custom_content import Attachment
 from task._utils.constants import API_KEY, DIAL_URL, DIAL_CHAT_COMPLETIONS_ENDPOINT
 from task._utils.bucket_client import DialBucketClient
@@ -36,22 +38,52 @@ class Quality:
     hd: str = "hd"
 
 async def _save_images(attachments: list[Attachment]):
-    # TODO:
     #  1. Create DIAL bucket client
-    #  2. Iterate through Images from attachments, download them and then save here
-    #  3. Print confirmation that image has been saved locally
-    raise NotImplementedError
+    async with DialBucketClient(api_key=API_KEY, base_url=DIAL_URL) as bucket_client:
+        #  2. Iterate through Images from attachments, download them and then save here
+        for att in attachments:
+            if att.type != 'image/png':
+                continue
+            att_img_url = att.url
+            fname = att_img_url.split("/")[-1]
+            att_img_bytes = await bucket_client.get_file(att_img_url)
+            with open(fname, "wb") as f_img:
+                f_img.write(att_img_bytes)
+            #  3. Print confirmation that image has been saved locally
+            print("Saved:", fname)
 
 
 def start() -> None:
-    # TODO:
     #  1. Create DialModelClient
+    client = DialModelClient(
+        endpoint=DIAL_CHAT_COMPLETIONS_ENDPOINT,
+        deployment_name="imagegeneration@005", # "dall-e-3",
+        api_key=API_KEY,
+    )
     #  2. Generate image for "Sunny day on Bali"
+    IMAGE_PROMPT = "Sunny day on Bali"
+    sq_vivid_hd = {
+        "size": Size.square,
+        "style": Style.vivid,
+        "quality": Quality.hd,
+    }
+    text_to_img_msg = Message(role=Role.USER, content=IMAGE_PROMPT)
+
+    print(datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f'), "Generating:", IMAGE_PROMPT)
+    ai_message = client.get_completion(
+        messages=[text_to_img_msg],
+        # custom_fields=sq_vivid_hd,
+    )
     #  3. Get attachments from response and save generated message (use method `_save_images`)
+    atts = ai_message.custom_content.attachments
+    print(datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f'), "URL:", atts[-1].url)
+    asyncio.run(_save_images(atts))
     #  4. Try to configure the picture for output via `custom_fields` parameter.
     #    - Documentation: See `custom_fields`. https://dialx.ai/dial_api#operation/sendChatCompletionRequest
     #  5. Test it with the 'imagegeneration@005' (Google image generation model)
-    raise NotImplementedError
 
-
-start()
+if __name__ == "__main__":
+    if len(sys.argv) == 1:
+        start()
+    else:
+        asyncio.run(_save_images([Attachment(type="image/png", url=sys.argv[1])]))

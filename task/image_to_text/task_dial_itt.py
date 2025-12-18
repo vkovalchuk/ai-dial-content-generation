@@ -1,3 +1,5 @@
+import sys
+
 import asyncio
 from io import BytesIO
 from pathlib import Path
@@ -14,7 +16,6 @@ async def _put_image() -> Attachment:
     file_name = 'dialx-banner.png'
     image_path = Path(__file__).parent.parent.parent / file_name
     mime_type_png = 'image/png'
-    # TODO:
     #  1. Create DialBucketClient
     #  2. Open image file
     #  3. Use BytesIO to load bytes of image
@@ -23,22 +24,31 @@ async def _put_image() -> Attachment:
     raise NotImplementedError
 
 
-def start() -> None:
-    # TODO:
+def start(fname) -> None:
     #  1. Create DialModelClient
+    client = DialModelClient(
+        endpoint=DIAL_CHAT_COMPLETIONS_ENDPOINT,
+        deployment_name="gpt-4o",
+        api_key=API_KEY,
+    )
     #  2. Upload image (use `_put_image` method )
     #  3. Print attachment to see result
     #  4. Call chat completion via client with list containing one Message:
     #    - role: Role.USER
     #    - content: "What do you see on this picture?"
     #    - custom_content: CustomContent(attachments=[attachment])
+    attachment = Attachment(type="image/png", url=fname)
+    text_to_img_msg = Message(
+        role=Role.USER,
+        content="What do you see on this picture?",
+        custom_content=CustomContent(attachments=[attachment]),
+    )
     #  ---------------------------------------------------------------------------------------------------------------
-    #  Note: This approach uploads the image to DIAL bucket and references it via attachment. The key benefit of this
-    #        approach that we can use Models from different vendors (OpenAI, Google, Anthropic). The DIAL Core
-    #        adapts this attachment to Message content in appropriate format for Model.
+    ai_message = client.get_completion(
+        messages=[text_to_img_msg],
+    )
     #  TRY THIS APPROACH WITH DIFFERENT MODELS!
     #  Optional: Try upload 2+ pictures for analysis
-    raise NotImplementedError
 
 
-start()
+start(sys.argv[1])
